@@ -29,8 +29,18 @@
 			"name":"name",
 			"requirement": {
 				"meaning":"dep",
-				"depth_g":"root"
+				"depth_g":"_called"
 			}
+		}
+	],
+	"actions":[
+		{
+			"type":"say",
+			"value":"creating $type"
+		},
+		{
+			"type":"sh",
+			"value":"touch $name"
 		}
 	]
 }

@@ -34,18 +34,6 @@ std::vector<std::string> split(const std::string &s, char delim) {
     return elems;
 }
 
-std::string exec(const char* cmd) {
-    std::array<char, 128> buffer;
-    std::string result;
-    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
-    if (!pipe) throw std::runtime_error("popen() failed!");
-    while (!feof(pipe.get())) {
-        if (fgets(buffer.data(), 128, pipe.get()) != nullptr)
-            result += buffer.data();
-    }
-    return result;
-}
-
 vector<string> getFiles(const char *path)
 {
 	vector<string> files;
@@ -69,7 +57,7 @@ void loadConfigs()
 {
 	std::vector<string> configs = getFiles("configs/");
 
-	for (int i = 0; i < configs.size(); ++i)
+	for (size_t i = 0; i < configs.size(); ++i)
 	{
 		string file = configs[i];
 		if (file.find(".cmd") != string::npos)
@@ -89,7 +77,7 @@ void processCommand(vector<Word> words)
 	Sentence s;
 	s.words = words;
 	
-	for	(int i = 0; i < commands.size(); i++)
+	for	(size_t i = 0; i < commands.size(); i++)
 	{
 		bool matches = commands[i].matches(s);
 		if (matches)
@@ -125,7 +113,7 @@ int main()
 	vector<Word> words;
 
 	cout << rawResult;
-	for (int i = 0; i < lines.size(); i++)
+	for (size_t i = 0; i < lines.size(); i++)
 	{
 		vector<string> parts = split(lines[i], '\t');
 		if (parts.size() > 0)

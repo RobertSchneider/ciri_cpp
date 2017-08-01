@@ -7,6 +7,18 @@
 using namespace std;
 using json = nlohmann::json;
 
+std::string exec(const char* cmd) {
+    std::array<char, 128> buffer;
+    std::string result;
+    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    if (!pipe) throw std::runtime_error("popen() failed!");
+    while (!feof(pipe.get())) {
+        if (fgets(buffer.data(), 128, pipe.get()) != nullptr)
+            result += buffer.data();
+    }
+    return result;
+}
+
 struct CommandRequirement
 {
 	string meaning;
@@ -20,11 +32,17 @@ struct CommandVariable
 	string name;
 	CommandRequirement requirement;
 	//runtime
+	Word *word;
+};
+struct CommandAction
+{
+	string type;
 	string value;
 };
 struct CommandStruct
 {
 	vector<CommandVariable> variables;
+	vector<CommandAction> actions;
 };
 
 void from_json(const json& j, CommandRequirement& r) {
@@ -40,9 +58,17 @@ void from_json(const json& j, CommandVariable& v) {
 	v.requirement = j.at("requirement").get<CommandRequirement>();
 }
 
+void from_json(const json& j, CommandAction& a) {
+	a.type = j.at("type").get<string>();
+	a.value = j.at("value").get<string>();
+}
+
 void from_json(const json& j, CommandStruct& cmd) {
 	cmd.variables = j.at("variables").get<vector<CommandVariable>>();
+	cmd.actions = j.at("actions").get<vector<CommandAction>>();
 }
+
+const char varIndicator = '$';
 
 class Command
 {
@@ -56,7 +82,10 @@ public:
 	
 private:
 	Word* getWordWithMeaning(Sentence *s, string meaning);
-	bool matchesRequirement(CommandRequirement r, Sentence *s, Word *wrd);
+	Word* matchesRequirement(CommandRequirement r, Sentence *s);
+	CommandVariable* getVariable(string name);
+	void processAction(CommandAction a);
+	string formatAction(string a);
 };
 
 Command::Command(json j)
@@ -67,20 +96,20 @@ Command::Command(json j)
 
 Word* Command::getWordWithMeaning(Sentence *s, string meaning)
 {
-	for (int i = 0; i < s->words.size(); i++)
+	for (size_t i = 0; i < s->words.size(); i++)
 	{
 		if (s->words[i].meaning == meaning) return &s->words[i];
 	}
 	return nullptr;
 }
 
-bool Command::matchesRequirement(CommandRequirement r, Sentence *s, Word *wrd)
+Word* Command::matchesRequirement(CommandRequirement r, Sentence *s)
 {
 	Word *w = getWordWithMeaning(s, r.meaning);
-	if (w == nullptr) return false;
+	if (w == nullptr) return nullptr;
 	
 	bool passedVals = r.values.size() == 0;
-	for (int i = 0; i < r.values.size(); i++)
+	for (size_t i = 0; i < r.values.size(); i++)
 	{
 		if (r.values[i] == w->word)
 		{
@@ -89,32 +118,98 @@ bool Command::matchesRequirement(CommandRequirement r, Sentence *s, Word *wrd)
 		}
 	}
 	
-	if (!passedVals) return false;
-	if (r.depth >= 0 && w->depth != r.depth) return false;
+	if (!passedVals) return nullptr;
+	if (r.depth >= 0 && w->depth != r.depth) return nullptr;
 	
-	*wrd = *w;
-	return true;
+	return w;
+}
+
+CommandVariable* Command::getVariable(string name)
+{
+	for (size_t i = 0; i < cmdStruct.variables.size(); i++)
+	{
+		if (cmdStruct.variables[i].name == name) return &cmdStruct.variables[i];
+	}
+	return nullptr;
 }
 
 bool Command::matches(Sentence s)
 {
 	//create variables
-	for (int i = 0; i < cmdStruct.variables.size(); i++)
+	for (size_t i = 0; i < cmdStruct.variables.size(); i++)
+	{
+		CommandVariable *v = &cmdStruct.variables[i];
+		Word *word = matchesRequirement(v->requirement, &s);
+		if (word == nullptr) return false;
+		
+		v->word = word;
+	}
+	
+	//solve depth dependencies
+	for (size_t i = 0; i < cmdStruct.variables.size(); i++)
 	{
 		CommandVariable v = cmdStruct.variables[i];
-		Word word;
-		bool matches = matchesRequirement(v.requirement, &s, &word);
-		if (!matches) return false;
-		
-		v.value = word.word;
+		if (v.requirement.depth_g.length() > 0) 
+		{
+			CommandVariable *dep = getVariable(v.requirement.depth_g);
+			if (dep == nullptr) return false;
+			if (dep->requirement.depth >= v.word->depth) return false;
+		}
 	}
 	
 	return true;
 }
 
+string Command::formatAction(string a)
+{
+	string result = "";
+	for(std::string::size_type i = 0; i < a.size(); i++) 
+	{
+		char c = a[i];
+		if (c == varIndicator)
+		{
+			string var = "";
+			i++;
+			while(i < a.size() && a[i] != ' ')
+			{
+				var += a[i];
+				i++;
+			}
+			
+			CommandVariable *v = getVariable(var);
+			if (v != nullptr)
+			{
+				result += v->word->word;
+			}
+		}else
+		{
+			result += c;
+		}
+	}
+	return result;
+}
+
+void Command::processAction(CommandAction a)
+{
+	string action = formatAction(a.value);
+	if (a.type == "say") 
+	{
+		cout << "+++ " << action << "\n";
+	}
+	if (a.type == "sh")
+	{
+		exec(action.c_str());
+	}
+}
+
 void Command::process(Sentence s)
 {
 	cout << "***PROCESSING CMD " << jsonData << "\n";
+	
+	for	(size_t i = 0; i < cmdStruct.actions.size(); i++)
+	{
+		processAction(cmdStruct.actions[i]);
+	}
 }
 
 #endif
