@@ -13,6 +13,7 @@
 #include <dirent.h>
 #include <sys/types.h>
 #include "Command.hpp"
+#include "Word.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -26,7 +27,6 @@ void split(const std::string &s, char delim, Out result) {
         *(result++) = item;
     }
 }
-
 
 std::vector<std::string> split(const std::string &s, char delim) {
     std::vector<std::string> elems;
@@ -44,21 +44,6 @@ std::string exec(const char* cmd) {
             result += buffer.data();
     }
     return result;
-}
-
-class Word
-{
-public:
-	int index;
-	string word;
-	string wordType;
-	int depth;
-	string meaning;
-};
-
-ostream & operator<<(ostream & str, Word const & v) { 
-	str << to_string(v.index) + " " + v.word + " " + v.wordType + " " + to_string(v.depth) + " " + v.meaning;
-	return str;
 }
 
 vector<string> getFiles(const char *path)
@@ -99,6 +84,20 @@ void loadConfigs()
 	}
 }
 
+void processCommand(vector<Word> words)
+{
+	Sentence s;
+	s.words = words;
+	
+	for	(int i = 0; i < commands.size(); i++)
+	{
+		bool matches = commands[i].matches(s);
+		if (matches)
+		{
+			commands[i].process(s);
+		}
+	}
+}
 
 int main()
 {
@@ -106,8 +105,18 @@ int main()
 
 	loadConfigs();
 
-	string response;
-	getline(cin, response);
+	string response = "create a file called test";
+	vector<Word> ws;
+	ws.push_back({1, "create", "VERB", 0,"ROOT"});
+	ws.push_back({2, "a", "DET", 3,"det"});
+	ws.push_back({3, "file", "NOUN", 1,"dobj"});
+	ws.push_back({4, "called", "VERB", 3,"partmod"});
+	ws.push_back({5, "test", "NOUN", 4,"dep"});
+
+	processCommand(ws);
+	return 0;
+	
+	//getline(cin, response);
 
 	string rawResult = exec(("python test.py \"" + response+"\"").c_str());
 
@@ -129,9 +138,10 @@ int main()
 			word.meaning = parts[7];
 
 			words.push_back(word);
-			cout << word << "\n";
 		}
 	}
+	
+	processCommand(words);
 
 	return 0;
 }

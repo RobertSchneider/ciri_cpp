@@ -1,1 +1,1 @@
-main.o: main.cc json.hpp
+main.o: main.cc json.hpp Command.hpp
