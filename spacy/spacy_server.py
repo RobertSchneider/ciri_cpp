@@ -1,9 +1,11 @@
 import socket
 import spacy
-import contextlib
 
-sock = socket.socket()
-sock.bind(('', 6789))
+HOST = socket.gethostbyname(socket.gethostname())
+print HOST
+
+sock = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+sock.bind((HOST, 6789))
 sock.listen(5)
 
 nlp = spacy.load('en')

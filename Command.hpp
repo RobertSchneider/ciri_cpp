@@ -3,71 +3,27 @@
 
 #include "json.hpp"
 #include "Word.hpp"
+#include "Structs.hpp"
 
 using namespace std;
 using json = nlohmann::json;
 
-std::string exec(const char* cmd) {
+std::string exec(string cmd, bool wrapper = false) {
+	
+	if (wrapper)
+	{
+		cmd = "python run.py \"" + cmd + "\"";
+	}
+
     std::array<char, 128> buffer;
     std::string result;
-    std::shared_ptr<FILE> pipe(popen(cmd, "r"), pclose);
+    std::shared_ptr<FILE> pipe(_popen(cmd.c_str(), "r"), _pclose);
     if (!pipe) throw std::runtime_error("popen() failed!");
     while (!feof(pipe.get())) {
         if (fgets(buffer.data(), 128, pipe.get()) != nullptr)
             result += buffer.data();
     }
     return result;
-}
-
-struct CommandRequirement
-{
-	vector<string> meanings;
-	vector<string> values;
-	int depth;
-	string depth_g;
-	string depth_l;
-};
-struct CommandVariable
-{
-	string name;
-	CommandRequirement requirement;
-	//runtime
-	Word *word;
-};
-struct CommandAction
-{
-	string type;
-	string value;
-	vector<vector<string>> conditions;
-};
-struct CommandStruct
-{
-	vector<CommandVariable> variables;
-	vector<CommandAction> actions;
-};
-
-void from_json(const json& j, CommandRequirement& r) {
-	r.meanings = j.at("meanings").get<vector<string>>();
-	if (j.find("values") != j.end()) r.values = j.at("values").get<vector<string>>();
-	if (j.find("depth") != j.end()) r.depth = j.at("depth").get<int>(); else r.depth = -1;
-	if (j.find("depth_g") != j.end()) r.depth_g = j.at("depth_g").get<string>(); else r.depth_g = "";
-	if (j.find("depth_l") != j.end()) r.depth_l = j.at("depth_l").get<string>(); else r.depth_l = "";
-}
-
-void from_json(const json& j, CommandVariable& v) {
-	v.name = j.at("name").get<string>();
-	v.requirement = j.at("requirement").get<CommandRequirement>();
-}
-
-void from_json(const json& j, CommandAction& a) {
-	a.type = j.at("type").get<string>();
-	a.value = j.at("value").get<string>();
-	if (j.find("conditions") != j.end()) a.conditions = j.at("conditions").get<vector<vector<string>>>();
-}
-
-void from_json(const json& j, CommandStruct& cmd) {
-	cmd.variables = j.at("variables").get<vector<CommandVariable>>();
-	cmd.actions = j.at("actions").get<vector<CommandAction>>();
 }
 
 const char varIndicator = '$';
@@ -79,8 +35,11 @@ public:
 	struct CommandStruct cmdStruct;
 	
 	Command(json j);
+	Command();
 	bool matches(Sentence s);
 	void process(Sentence s);
+
+	string currentSentence;
 	
 private:
 	Word* getWordWithMeaning(Sentence *s, CommandVariable v);
@@ -93,10 +52,19 @@ private:
 	string formatAction(string a);
 };
 
+void from_json(const json& j, Command& cmd) {
+
+}
+
 Command::Command(json j)
 {
 	jsonData = j;
 	cmdStruct = j;
+}
+
+Command::Command()
+{
+
 }
 
 Word* Command::getWordWithMeaning(Sentence *s, CommandVariable v)
@@ -228,21 +196,33 @@ string Command::formatAction(string a)
 	return result;
 }
 
+void say(string s)
+{
+	exec(("python say.py \"" + s + "\" &").c_str());
+}
+
 void Command::processAction(CommandAction a)
 {
 	string action = formatAction(a.value);
 	if (a.type == "say") 
 	{
 		cout << "+++ " << action << "\n";
+		currentSentence += action;
 	}
 	if (a.type == "sh")
 	{
 		cout << "> " << action << "\n";
-		string output = exec(("cd playground; " + action).c_str());
+		string output = exec(("cd playground && " + action).c_str(), true);
 		if (output.length() > 0)
 		{
-			cout << "<" <<  output << "\n";
+			cout << "<" << output << "\n";
+			currentSentence += output;
 		}
+	}
+	if (a.type == "commit")
+	{
+		say(currentSentence);
+		currentSentence = "";
 	}
 }
 
@@ -271,6 +251,7 @@ bool Command::getActionConditionsSatisfied(CommandAction a)
 
 void Command::process(Sentence s)
 {
+	currentSentence = "";
 	cout << "***PROCESSING CMD " << jsonData << "\n";
 	
 	for	(size_t i = 0; i < cmdStruct.actions.size(); i++)
@@ -279,6 +260,12 @@ void Command::process(Sentence s)
 		{
 			processAction(cmdStruct.actions[i]);
 		}
+	}
+
+	if (currentSentence.length() > 0)
+	{
+		say(currentSentence);
+		currentSentence = "";
 	}
 }
 

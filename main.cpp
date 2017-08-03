@@ -9,11 +9,16 @@
 #include <iterator>
 #include <fstream>
 #include <streambuf>
-#include "json.hpp"
-#include <dirent.h>
 #include <sys/types.h>
+#include <windows.h>
+#include <tchar.h> 
+#include <stdio.h>
+#include <strsafe.h>
+
 #include "Command.hpp"
 #include "Word.hpp"
+#include "Structs.hpp"
+#include "json.hpp"
 
 using namespace std;
 using json = nlohmann::json;
@@ -37,25 +42,28 @@ std::vector<std::string> split(const std::string &s, char delim) {
 vector<string> getFiles(const char *path)
 {
 	vector<string> files;
-    struct dirent *entry;
-    DIR *dir = opendir(path);
-    if (dir == NULL) {
-        return files;
-    }
 
-    while ((entry = readdir(dir)) != NULL) {
-        files.push_back(entry->d_name);
-    }
+	HANDLE hfind;
+	WIN32_FIND_DATA data;
 
-    closedir(dir);
-    return files;
+	hfind = FindFirstFile(path, &data);
+	if (hfind != INVALID_HANDLE_VALUE)
+	{
+		do
+		{
+			files.push_back(data.cFileName);
+		} while (FindNextFile(hfind, &data));
+	}
+
+	return files;
 }
 
 vector<Command> commands;
 
 void loadConfigs()
 {
-	std::vector<string> configs = getFiles("configs/");
+	string path = "E:/Development/ciri_cpp/configs/";
+	std::vector<string> configs = getFiles((path + "/*").c_str());
 
 	for (size_t i = 0; i < configs.size(); ++i)
 	{
@@ -63,11 +71,11 @@ void loadConfigs()
 		if (file.find(".cmd") != string::npos)
 		{
 			cout << "***FOUND CONFIG " << file << "***\n";
-			ifstream t("configs/" + file);
+			ifstream t(path + file);
 			string str((istreambuf_iterator<char>(t)), istreambuf_iterator<char>());
 
 			json jcreate = json::parse(str);
-			commands.push_back(jcreate);
+			commands.push_back(Command(jcreate));
 		}
 	}
 }

@@ -1,3 +1,5 @@
+#undef max
+#undef min
 /*
     __ _____ _____ _____
  __|  |   __|     |   | |  JSON for Modern C++

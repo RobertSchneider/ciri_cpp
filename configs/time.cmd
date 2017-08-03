@@ -25,6 +25,10 @@
 		{
 			"type":"sh",
 			"value":"date"
+		},
+		{
+			"type":"commit",
+			"value":""
 		}
 	]
 }
