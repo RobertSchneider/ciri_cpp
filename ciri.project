@@ -106,5 +106,6 @@
   </Settings>
   <VirtualDirectory Name="configs">
     <File Name="configs/create.cmd"/>
+    <File Name="configs/time.cmd"/>
   </VirtualDirectory>
 </CodeLite_Project>

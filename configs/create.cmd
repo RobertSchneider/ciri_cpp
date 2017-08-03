@@ -2,25 +2,25 @@
 	"variables": 
 	[
 		{
-			"name":"root",
+			"name":"_create",
 			"requirement": {
-				"meaning":"ROOT",
-				"values":["create"],
+				"meanings":["ROOT"],
+				"values":["create", "add", "make"],
 				"depth":0
 			}
 		},
 		{
 			"name":"type",
 			"requirement": {
-				"meaning":"dobj",
-				"values":["file"],
-				"depth":1
+				"meanings":["dobj"],
+				"values":["file", "directory", "folder"],
+				"depth_g":"_create"
 			}
 		},
 		{
 			"name":"_called",
 			"requirement": {
-				"meaning":"partmod",
+				"meanings":["acl"],
 				"values":["called", "named"]
 			}
 		},
@@ -28,7 +28,7 @@
 		{
 			"name":"name",
 			"requirement": {
-				"meaning":"dep",
+				"meanings":["oprd", "dobj"],
 				"depth_g":"_called"
 			}
 		}
@@ -36,11 +36,21 @@
 	"actions":[
 		{
 			"type":"say",
-			"value":"creating $type"
+			"value":"creating $type $_called $name"
 		},
 		{
 			"type":"sh",
+			"conditions": [
+				["type","file"]
+			],
 			"value":"touch $name"
+		},
+		{
+			"type":"sh",
+			"conditions": [
+				["type","directory", "folder"]
+			],
+			"value":"mkdir $name"
 		}
 	]
 }

@@ -21,7 +21,7 @@ std::string exec(const char* cmd) {
 
 struct CommandRequirement
 {
-	string meaning;
+	vector<string> meanings;
 	vector<string> values;
 	int depth;
 	string depth_g;
@@ -38,6 +38,7 @@ struct CommandAction
 {
 	string type;
 	string value;
+	vector<vector<string>> conditions;
 };
 struct CommandStruct
 {
@@ -46,7 +47,7 @@ struct CommandStruct
 };
 
 void from_json(const json& j, CommandRequirement& r) {
-	r.meaning = j.at("meaning").get<string>();
+	r.meanings = j.at("meanings").get<vector<string>>();
 	if (j.find("values") != j.end()) r.values = j.at("values").get<vector<string>>();
 	if (j.find("depth") != j.end()) r.depth = j.at("depth").get<int>(); else r.depth = -1;
 	if (j.find("depth_g") != j.end()) r.depth_g = j.at("depth_g").get<string>(); else r.depth_g = "";
@@ -61,6 +62,7 @@ void from_json(const json& j, CommandVariable& v) {
 void from_json(const json& j, CommandAction& a) {
 	a.type = j.at("type").get<string>();
 	a.value = j.at("value").get<string>();
+	if (j.find("conditions") != j.end()) a.conditions = j.at("conditions").get<vector<vector<string>>>();
 }
 
 void from_json(const json& j, CommandStruct& cmd) {
@@ -81,9 +83,12 @@ public:
 	void process(Sentence s);
 	
 private:
-	Word* getWordWithMeaning(Sentence *s, string meaning);
-	Word* matchesRequirement(CommandRequirement r, Sentence *s);
+	Word* getWordWithMeaning(Sentence *s, CommandVariable v);
+	Word* matchesRequirement(CommandVariable v, Sentence *s);
 	CommandVariable* getVariable(string name);
+	int getVariableMinDepth(CommandVariable v);
+	
+	bool getActionConditionsSatisfied(CommandAction a);
 	void processAction(CommandAction a);
 	string formatAction(string a);
 };
@@ -94,18 +99,37 @@ Command::Command(json j)
 	cmdStruct = j;
 }
 
-Word* Command::getWordWithMeaning(Sentence *s, string meaning)
+Word* Command::getWordWithMeaning(Sentence *s, CommandVariable v)
 {
+	vector<string> meanings = v.requirement.meanings;
 	for (size_t i = 0; i < s->words.size(); i++)
 	{
-		if (s->words[i].meaning == meaning) return &s->words[i];
+		for (size_t j = 0; j < meanings.size(); j++)
+		{
+			if (s->words[i].meaning == meanings[j]) 
+			{
+				if (v.requirement.depth_g.length() > 0) 
+				{
+					CommandVariable *dep = getVariable(v.requirement.depth_g);
+					if (dep == nullptr) continue;
+					int g = getVariableMinDepth(*dep);
+					if (g >= s->words[i].depth) 
+					{
+						continue;
+					}
+				}
+				
+				return &s->words[i];
+			}
+		}
 	}
 	return nullptr;
 }
 
-Word* Command::matchesRequirement(CommandRequirement r, Sentence *s)
+Word* Command::matchesRequirement(CommandVariable v, Sentence *s)
 {
-	Word *w = getWordWithMeaning(s, r.meaning);
+	CommandRequirement r = v.requirement;
+	Word *w = getWordWithMeaning(s, v);
 	if (w == nullptr) return nullptr;
 	
 	bool passedVals = r.values.size() == 0;
@@ -133,13 +157,25 @@ CommandVariable* Command::getVariable(string name)
 	return nullptr;
 }
 
+int Command::getVariableMinDepth(CommandVariable v)
+{
+	if (v.requirement.depth >= 0) return v.requirement.depth;
+	if (v.requirement.depth_g.length() > 0) 
+	{
+		CommandVariable *dep = getVariable(v.requirement.depth_g);
+		if (dep == nullptr) return -1;
+		return getVariableMinDepth(*dep) + 1;
+	}
+	return v.word->depth;
+}
+
 bool Command::matches(Sentence s)
 {
 	//create variables
 	for (size_t i = 0; i < cmdStruct.variables.size(); i++)
 	{
 		CommandVariable *v = &cmdStruct.variables[i];
-		Word *word = matchesRequirement(v->requirement, &s);
+		Word *word = matchesRequirement(*v, &s);
 		if (word == nullptr) return false;
 		
 		v->word = word;
@@ -153,9 +189,11 @@ bool Command::matches(Sentence s)
 		{
 			CommandVariable *dep = getVariable(v.requirement.depth_g);
 			if (dep == nullptr) return false;
-			if (dep->requirement.depth >= v.word->depth) return false;
+			int g = getVariableMinDepth(*dep);
+			if (g >= v.word->depth) return false;
 		}
 	}
+	
 	
 	return true;
 }
@@ -181,6 +219,7 @@ string Command::formatAction(string a)
 			{
 				result += v->word->word;
 			}
+			i--;
 		}else
 		{
 			result += c;
@@ -198,8 +237,36 @@ void Command::processAction(CommandAction a)
 	}
 	if (a.type == "sh")
 	{
-		exec(action.c_str());
+		cout << "> " << action << "\n";
+		string output = exec(("cd playground; " + action).c_str());
+		if (output.length() > 0)
+		{
+			cout << "<" <<  output << "\n";
+		}
 	}
+}
+
+bool Command::getActionConditionsSatisfied(CommandAction a)
+{
+	for	(size_t i = 0; i < a.conditions.size(); i++)
+	{
+		CommandVariable *var = getVariable(a.conditions[i][0]);
+		if (var == nullptr) return false;
+		
+		bool satisfied = false; 
+		for (size_t j = 1; j < a.conditions[i].size(); j++)
+		{
+			if (var->word->word == a.conditions[i][j])
+			{
+				satisfied = true;
+				break;
+			}
+		}
+		
+		if (!satisfied) return false;
+	}
+	
+	return true;
 }
 
 void Command::process(Sentence s)
@@ -208,7 +275,10 @@ void Command::process(Sentence s)
 	
 	for	(size_t i = 0; i < cmdStruct.actions.size(); i++)
 	{
-		processAction(cmdStruct.actions[i]);
+		if (getActionConditionsSatisfied(cmdStruct.actions[i]))
+		{
+			processAction(cmdStruct.actions[i]);
+		}
 	}
 }
 

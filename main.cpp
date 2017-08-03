@@ -85,6 +85,8 @@ void processCommand(vector<Word> words)
 			commands[i].process(s);
 		}
 	}
+	
+	cout << "** FINISHED PROCESSING\n";
 }
 
 int main()
@@ -93,7 +95,7 @@ int main()
 
 	loadConfigs();
 
-	string response = "create a file called test";
+	/*string response = "create a file called test";
 	vector<Word> ws;
 	ws.push_back({1, "create", "VERB", 0,"ROOT"});
 	ws.push_back({2, "a", "DET", 3,"det"});
@@ -102,34 +104,40 @@ int main()
 	ws.push_back({5, "test", "NOUN", 4,"dep"});
 
 	processCommand(ws);
-	return 0;
+	return 0;*/
 	
-	//getline(cin, response);
-
-	string rawResult = exec(("python test.py \"" + response+"\"").c_str());
-
-	vector<string> lines = split(rawResult, '\n');
-
-	vector<Word> words;
-
-	cout << rawResult;
-	for (size_t i = 0; i < lines.size(); i++)
+	while(true)
 	{
-		vector<string> parts = split(lines[i], '\t');
-		if (parts.size() > 0)
-		{
-			Word word;
-			word.index = stoi(parts[0]);
-			word.word = parts[1];
-			word.wordType = parts[3];
-			word.depth = stoi(parts[6]);
-			word.meaning = parts[7];
+		string response = "";
+		getline(cin, response);
 
-			words.push_back(word);
+		//string additional = " 3>&1 2>&3 3>&- | grep -v \":\ I\ \" | grep -v \"WARNING:tensorflow\" | grep -v ^pciBusID | grep -v ^major: | grep -v ^name: |grep -v ^Total\\ memory:|grep -v ^Free\\ memory:|grep -v \"INFO:\"|grep -v \"cpu_feature_guard.cc\"";
+		string rawResult = exec(("python nlp.py \"" + response+"\"").c_str());
+		vector<string> lines = split(rawResult, '\n');
+
+		vector<Word> words;
+
+		cout << rawResult;
+		for (size_t i = 0; i < lines.size() - 1; i++)
+		{
+			vector<string> parts = split(lines[i], ' ');
+			if (parts.size() > 0)
+			{
+				Word word;
+				word.index = stoi(parts[0]);
+				word.word = parts[1];
+				word.wordType = parts[2];
+				word.depth = stoi(parts[3]);
+				word.meaning = parts[4];
+				
+				if (word.meaning == "ROOT") word.depth = 0;
+
+				words.push_back(word);
+			}
 		}
+		
+		processCommand(words);
 	}
-	
-	processCommand(words);
 
 	return 0;
 }
