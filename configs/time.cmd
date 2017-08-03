@@ -2,26 +2,29 @@
 	"variables": 
 	[
 		{
-			"name":"_execute",
+			"name":"_tell",
 			"requirement": {
 				"meanings":["ROOT"],
-				"values":["execute", "run"],
-				"depth":0
+				"values":["tell"]
 			}
 		},
 		{
-			"name":"cmd",
+			"name":"_time",
 			"requirement": {
 				"meanings":["dobj"],
-				"values":["command", "bash", "shell"],
-				"depth_g":"_execute"
+				"values":["time"],
+				"depth_g":"_tell"
 			}
 		}
 	],
 	"actions":[
 		{
 			"type":"say",
-			"value":"creating $type $_called $name"
+			"value":"the $_time is"
+		},
+		{
+			"type":"sh",
+			"value":"date"
 		}
 	]
 }
