@@ -110,6 +110,8 @@
   </ItemGroup>
   <ItemGroup>
     <None Include="configs\create.cmd" />
+    <None Include="configs\how_are_you.cmd" />
+    <None Include="configs\list_files.cmd" />
     <None Include="configs\thanks.cmd" />
     <None Include="configs\time.cmd" />
   </ItemGroup>

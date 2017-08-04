@@ -43,5 +43,11 @@
     <None Include="configs\thanks.cmd">
       <Filter>Resource Files</Filter>
     </None>
+    <None Include="configs\how_are_you.cmd">
+      <Filter>Resource Files</Filter>
+    </None>
+    <None Include="configs\list_files.cmd">
+      <Filter>Resource Files</Filter>
+    </None>
   </ItemGroup>
 </Project>

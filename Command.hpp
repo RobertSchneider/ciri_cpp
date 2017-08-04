@@ -1,6 +1,8 @@
 #ifndef COMMAND_HPP
 #define COMMAND_HPP
 
+#include <thread>
+
 #include "json.hpp"
 #include "Word.hpp"
 #include "Structs.hpp"
@@ -50,6 +52,7 @@ private:
 	bool getActionConditionsSatisfied(CommandAction a);
 	void processAction(CommandAction a);
 	string formatAction(string a);
+	void sayOutput();
 };
 
 void from_json(const json& j, Command& cmd) {
@@ -198,7 +201,14 @@ string Command::formatAction(string a)
 
 void say(string s)
 {
-	exec(("python say.py \"" + s + "\" &").c_str());
+	exec(("python say.py \"" + s + "\"").c_str());
+}
+
+void Command::sayOutput()
+{
+	currentSentence.erase(remove(currentSentence.begin(), currentSentence.end(), '\n'), currentSentence.end());
+	thread t(say, currentSentence);
+	t.join();
 }
 
 void Command::processAction(CommandAction a)
@@ -221,7 +231,7 @@ void Command::processAction(CommandAction a)
 	}
 	if (a.type == "commit")
 	{
-		say(currentSentence);
+		sayOutput();
 		currentSentence = "";
 	}
 }
@@ -252,7 +262,6 @@ bool Command::getActionConditionsSatisfied(CommandAction a)
 void Command::process(Sentence s)
 {
 	currentSentence = "";
-	cout << "***PROCESSING CMD " << jsonData << "\n";
 	
 	for	(size_t i = 0; i < cmdStruct.actions.size(); i++)
 	{
@@ -264,7 +273,7 @@ void Command::process(Sentence s)
 
 	if (currentSentence.length() > 0)
 	{
-		say(currentSentence);
+		sayOutput();
 		currentSentence = "";
 	}
 }

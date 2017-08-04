@@ -14,6 +14,7 @@
 #include <tchar.h> 
 #include <stdio.h>
 #include <strsafe.h>
+#include <thread>
 
 #include "Command.hpp"
 #include "Word.hpp"
@@ -97,11 +98,55 @@ void processCommand(vector<Word> words)
 	cout << "** FINISHED PROCESSING\n";
 }
 
+void processSentence(string response)
+{
+	string rawResult = exec(("python nlp.py \"" + response + "\"").c_str());
+	vector<string> lines = split(rawResult, '\n');
+
+	vector<Word> words;
+
+	cout << rawResult;
+	for (size_t i = 0; i < lines.size() - 1; i++)
+	{
+		vector<string> parts = split(lines[i], ' ');
+		if (parts.size() > 0)
+		{
+			Word word;
+			word.index = stoi(parts[0]);
+			word.word = parts[1];
+			word.wordType = parts[2];
+			word.depth = stoi(parts[3]);
+			word.meaning = parts[4];
+
+			if (word.meaning == "ROOT") word.depth = 0;
+
+			words.push_back(word);
+		}
+	}
+
+	processCommand(words);
+}
+
+void listeningThread()
+{
+	while (true)
+	{
+		string output = exec("python speech.py");
+		if (output.length() > 0)
+		{
+			cout << output;
+			processSentence(output);
+		}
+	}
+}
+
 int main()
 {
 	cout << "***CIRI****\n";
 
 	loadConfigs();
+
+	thread t1(listeningThread);
 
 	/*string response = "create a file called test";
 	vector<Word> ws;
@@ -120,31 +165,8 @@ int main()
 		getline(cin, response);
 
 		//string additional = " 3>&1 2>&3 3>&- | grep -v \":\ I\ \" | grep -v \"WARNING:tensorflow\" | grep -v ^pciBusID | grep -v ^major: | grep -v ^name: |grep -v ^Total\\ memory:|grep -v ^Free\\ memory:|grep -v \"INFO:\"|grep -v \"cpu_feature_guard.cc\"";
-		string rawResult = exec(("python nlp.py \"" + response+"\"").c_str());
-		vector<string> lines = split(rawResult, '\n');
-
-		vector<Word> words;
-
-		cout << rawResult;
-		for (size_t i = 0; i < lines.size() - 1; i++)
-		{
-			vector<string> parts = split(lines[i], ' ');
-			if (parts.size() > 0)
-			{
-				Word word;
-				word.index = stoi(parts[0]);
-				word.word = parts[1];
-				word.wordType = parts[2];
-				word.depth = stoi(parts[3]);
-				word.meaning = parts[4];
-				
-				if (word.meaning == "ROOT") word.depth = 0;
-
-				words.push_back(word);
-			}
-		}
 		
-		processCommand(words);
+		processSentence(response);
 	}
 
 	return 0;

@@ -24,7 +24,7 @@
 		},
 		{
 			"type":"sh",
-			"value":"date"
+			"value":"date +'%a %H:%M:%S'"
 		},
 		{
 			"type":"commit",
